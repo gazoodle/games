@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Games</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #16283c;
+    --paper: #fdf6e3;
+    --line: #2f4d6e;
+    --x: #e0492f;
+    --o: #1f8a8c;
+    --light: #e8dcc0;
+    --dark: #4a6c8f;
+    --glow: #ffcf4d;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--paper);
+    background-image: radial-gradient(circle at 1px 1px, rgba(47,77,110,.13) 1px, transparent 0);
+    background-size: 22px 22px;
+    color: var(--ink);
+    font-family: Fredoka, system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  #root { width: 100%; max-width: 420px; }
+  h1 { font-size: clamp(32px, 10vw, 48px); margin: 0 0 6px; letter-spacing: -1.5px; text-align: center; }
+  .sub { text-align: center; font-size: 16px; opacity: .65; margin-bottom: 22px; }
+  a.card {
+    display: flex; align-items: center; gap: 16px;
+    text-decoration: none; color: inherit;
+    background: #fff; border-radius: 18px; padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 0 rgba(47,77,110,.28);
+    transition: transform .08s;
+  }
+  a.card:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(47,77,110,.28); }
+  a.card:focus-visible { outline: 4px solid var(--glow); outline-offset: 3px; }
+  .name { font-size: 24px; font-weight: 700; line-height: 1.1; }
+  .desc { font-size: 14px; opacity: .6; margin-top: 3px; }
+  .thumb { width: 72px; height: 72px; flex: none; border-radius: 12px; overflow: hidden; padding: 5px; background: var(--line); }
+  .ttt { display: grid; grid-template-columns: repeat(3,1fr); gap: 3px; width: 100%; height: 100%; }
+  .ttt div {
+    background: var(--paper); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 700; line-height: 1;
+  }
+  .chq { display: grid; grid-template-columns: repeat(4,1fr); width: 100%; height: 100%; border-radius: 4px; overflow: hidden; }
+  .chq div { display: flex; align-items: center; justify-content: center; }
+  .chq .d { background: var(--dark); }
+  .chq .l { background: var(--light); }
+  .chq i { width: 68%; height: 68%; border-radius: 50%; display: block; }
+</style>
+</head>
+<body>
+<div id="root">
+  <h1>Games</h1>
+  <div class="sub">Pick one</div>
+
+  <a class="card" href="./noughts/">
+    <div class="thumb">
+      <div class="ttt">
+        <div style="color:var(--x)">X</div><div></div><div style="color:var(--o)">O</div>
+        <div></div><div style="color:var(--x)">X</div><div></div>
+        <div style="color:var(--o)">O</div><div></div><div style="color:var(--x)">X</div>
+      </div>
+    </div>
+    <div>
+      <div class="name">Tic-Tac-Toe</div>
+      <div class="desc">Three in a row. You're X.</div>
+    </div>
+  </a>
+
+  <a class="card" href="./chequers/">
+    <div class="thumb">
+      <div class="chq">
+        <div class="l"></div><div class="d"><i style="background:#23303d"></i></div><div class="l"></div><div class="d"><i style="background:#23303d"></i></div>
+        <div class="d"></div><div class="l"></div><div class="d"></div><div class="l"></div>
+        <div class="l"></div><div class="d"></div><div class="l"></div><div class="d"></div>
+        <div class="d"><i style="background:#e0492f"></i></div><div class="l"></div><div class="d"><i style="background:#e0492f"></i></div><div class="l"></div>
+      </div>
+    </div>
+    <div>
+      <div class="name">Chequers</div>
+      <div class="desc">Jump and take. You're red.</div>
+    </div>
+  </a>
+</div>
+</body>
+</html>
