@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Chequers</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #16283c;
+    --paper: #fdf6e3;
+    --line: #2f4d6e;
+    --red: #e0492f;
+    --dark: #24384f;
+    --light: #f0e2c0;
+    --square: #7e9ab0;
+    --glow: #ffcf4d;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--paper);
+    background-image: radial-gradient(circle at 1px 1px, rgba(47,77,110,.13) 1px, transparent 0);
+    background-size: 22px 22px;
+    color: var(--ink);
+    font-family: Fredoka, system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  #root { width: 100%; max-width: 440px; }
+  h1 { font-size: clamp(28px, 8vw, 40px); margin: 0 0 2px; letter-spacing: -1px; text-align: center; }
+  .status { text-align: center; font-size: 18px; min-height: 28px; margin-bottom: 12px; font-weight: 500; }
+  .board {
+    display: grid; grid-template-columns: repeat(8, 1fr);
+    background: var(--line); padding: 8px; border-radius: 16px;
+    box-shadow: 0 8px 0 rgba(47,77,110,.35);
+    overflow: hidden;
+  }
+  .sq {
+    aspect-ratio: 1; border: none; padding: 0; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sq.light { background: var(--light); }
+  .sq.dark { background: var(--square); cursor: pointer; }
+  .sq:focus-visible { outline: 3px solid var(--glow); outline-offset: -3px; z-index: 2; }
+  .pc {
+    width: 76%; height: 76%; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transition: transform .12s;
+  }
+  .pc.r { background: var(--red); box-shadow: inset 0 -4px 0 rgba(0,0,0,.22); }
+  .pc.b { background: var(--dark); box-shadow: inset 0 -4px 0 rgba(0,0,0,.35); }
+  .pc.king::after { content: "\2655"; font-size: clamp(13px, 3.6vw, 20px); color: var(--glow); line-height: 1; }
+  .sq.sel .pc { transform: scale(1.14); }
+  .sq.sel { box-shadow: inset 0 0 0 4px var(--glow); }
+  .dot {
+    position: absolute; width: 30%; height: 30%; border-radius: 50%;
+    background: var(--glow); box-shadow: 0 0 0 3px rgba(255,207,77,.35);
+  }
+  .dot.take { width: 46%; height: 46%; background: transparent; box-shadow: inset 0 0 0 5px var(--glow); }
+  .score { display: flex; gap: 8px; margin-top: 14px; text-align: center; }
+  .score div { flex: 1; background: #fff; border-radius: 12px; padding: 8px 4px; box-shadow: 0 3px 0 rgba(47,77,110,.2); }
+  .score span { display: block; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; opacity: .65; }
+  .score b { font-size: 24px; }
+  .row { display: flex; gap: 8px; margin-top: 12px; }
+  button.act {
+    flex: 1; padding: 13px; font-family: inherit; font-size: 17px; font-weight: 700;
+    border: none; border-radius: 14px; background: var(--line); color: var(--paper); cursor: pointer;
+    box-shadow: 0 5px 0 rgba(47,77,110,.4);
+  }
+  button.act.ghost { background: #fff; color: var(--ink); box-shadow: 0 5px 0 rgba(47,77,110,.2); }
+  button.act:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(47,77,110,.4); }
+  .hint { text-align: center; font-size: 13px; opacity: .6; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+/* English draughts: men move and capture forward only, kings both ways,
+   capturing is compulsory, multi-jumps must be completed, crowning ends the turn.
+   A move object carries the whole jump chain, so the UI never needs chain state. */
+
+const isDark = (r, c) => (r + c) % 2 === 1;
+const owner = p => (p ? p.toLowerCase() : null);
+const isKing = p => p && p === p.toUpperCase();
+const dirsFor = p => isKing(p)
+  ? [[-1,-1],[-1,1],[1,-1],[1,1]]
+  : (owner(p) === "r" ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]]);
+
+function initialBoard() {
+  const b = Array(64).fill(null);
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 8; c++) if (isDark(r,c)) b[r*8+c] = "b";
+  for (let r = 5; r < 8; r++) for (let c = 0; c < 8; c++) if (isDark(r,c)) b[r*8+c] = "r";
+  return b;
+}
+
+function jumpsFrom(board, idx, piece, captured, path) {
+  const r = Math.floor(idx/8), c = idx % 8;
+  const out = [];
+  for (const d of dirsFor(piece)) {
+    const dr = d[0], dc = d[1];
+    const mr = r+dr, mc = c+dc, lr = r+2*dr, lc = c+2*dc;
+    if (lr < 0 || lr > 7 || lc < 0 || lc > 7) continue;
+    const mid = mr*8+mc, land = lr*8+lc;
+    const mp = board[mid];
+    if (!mp || owner(mp) === owner(piece) || captured.indexOf(mid) !== -1) continue;
+    if (board[land]) continue;
+    const nb = board.slice();
+    nb[idx] = null; nb[mid] = null;
+    let np = piece, crowned = false;
+    if (!isKing(piece) && ((owner(piece) === "r" && lr === 0) || (owner(piece) === "b" && lr === 7))) {
+      np = piece.toUpperCase(); crowned = true;
+    }
+    nb[land] = np;
+    const ncap = captured.concat([mid]), npath = path.concat([land]);
+    const more = crowned ? [] : jumpsFrom(nb, land, np, ncap, npath);
+    if (more.length) out.push.apply(out, more);
+    else out.push({ from: path[0], to: land, path: npath, captures: ncap, crowned });
+  }
+  return out;
+}
+
+function legalMoves(board, side) {
+  const jumps = [];
+  for (let i = 0; i < 64; i++) {
+    const p = board[i];
+    if (p && owner(p) === side) jumps.push.apply(jumps, jumpsFrom(board, i, p, [], [i]));
+  }
+  if (jumps.length) return jumps;
+  const steps = [];
+  for (let i = 0; i < 64; i++) {
+    const p = board[i];
+    if (!p || owner(p) !== side) continue;
+    const r = Math.floor(i/8), c = i % 8;
+    for (const d of dirsFor(p)) {
+      const nr = r+d[0], nc = c+d[1];
+      if (nr < 0 || nr > 7 || nc < 0 || nc > 7) continue;
+      const t = nr*8+nc;
+      if (board[t]) continue;
+      steps.push({ from: i, to: t, path: [i, t], captures: [],
+        crowned: !isKing(p) && ((side === "r" && nr === 0) || (side === "b" && nr === 7)) });
+    }
+  }
+  return steps;
+}
+
+function applyMove(board, m) {
+  const nb = board.slice();
+  const p = nb[m.from];
+  nb[m.from] = null;
+  for (const i of m.captures) nb[i] = null;
+  nb[m.to] = m.crowned ? p.toUpperCase() : p;
+  return nb;
+}
+
+function evaluate(b) {
+  let s = 0;
+  for (let i = 0; i < 64; i++) {
+    const p = b[i];
+    if (!p) continue;
+    const r = Math.floor(i/8);
+    let v = isKing(p) ? 18 : 10;
+    if (!isKing(p)) v += (owner(p) === "b" ? r : 7 - r) * 0.4;
+    s += owner(p) === "b" ? v : -v;
+  }
+  return s;
+}
+
+function search(b, side, depth, alpha, beta) {
+  const ms = legalMoves(b, side);
+  if (!ms.length) return side === "b" ? -900 : 900;
+  if (depth === 0) return evaluate(b);
+  if (side === "b") {
+    let best = -Infinity;
+    for (const m of ms) {
+      best = Math.max(best, search(applyMove(b, m), "r", depth-1, alpha, beta));
+      alpha = Math.max(alpha, best);
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+  let best = Infinity;
+  for (const m of ms) {
+    best = Math.min(best, search(applyMove(b, m), "b", depth-1, alpha, beta));
+    beta = Math.min(beta, best);
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
+// Depth 3 plus jitter smaller than a man's value: plays sensibly, still losable.
+function chooseMove(b) {
+  const ms = legalMoves(b, "b");
+  if (!ms.length) return null;
+  let bestM = ms[0], bestS = -Infinity;
+  for (const m of ms) {
+    const s = search(applyMove(b, m), "r", 3, -Infinity, Infinity) + Math.random() * 0.9;
+    if (s > bestS) { bestS = s; bestM = m; }
+  }
+  return bestM;
+}
+
+function App() {
+  const [board, setBoard] = useState(initialBoard);
+  const [turn, setTurn] = useState("r");
+  const [sel, setSel] = useState(null);
+  const [score, setScore] = useState({ you: 0, cpu: 0 });
+  const [counted, setCounted] = useState(false);
+
+  const myMoves = turn === "r" ? legalMoves(board, "r") : [];
+  const cpuStuck = turn === "b" && legalMoves(board, "b").length === 0;
+  const youStuck = turn === "r" && myMoves.length === 0;
+  const over = cpuStuck || youStuck;
+
+  useEffect(() => {
+    if (over || turn !== "b") return;
+    const t = setTimeout(() => {
+      const m = chooseMove(board);
+      if (m) { setBoard(applyMove(board, m)); setTurn("r"); }
+    }, 420);
+    return () => clearTimeout(t);
+  }, [turn, over, board]);
+
+  useEffect(() => {
+    if (!over || counted) return;
+    setCounted(true);
+    setScore(s => cpuStuck ? { you: s.you + 1, cpu: s.cpu } : { you: s.you, cpu: s.cpu + 1 });
+  }, [over, counted, cpuStuck]);
+
+  const targetMap = new Map();
+  if (sel !== null) for (const m of myMoves) if (m.from === sel && !targetMap.has(m.to)) targetMap.set(m.to, m);
+
+  function tap(i) {
+    if (over || turn !== "r") return;
+    const m = targetMap.get(i);
+    if (m) { setBoard(applyMove(board, m)); setSel(null); setTurn("b"); return; }
+    if (board[i] && owner(board[i]) === "r" && myMoves.some(x => x.from === i)) setSel(i);
+    else setSel(null);
+  }
+
+  function reset() {
+    setBoard(initialBoard()); setTurn("r"); setSel(null); setCounted(false);
+  }
+
+  const mustTake = turn === "r" && myMoves.length > 0 && myMoves[0].captures.length > 0;
+  const status = cpuStuck ? "You win! \uD83C\uDF89"
+    : youStuck ? "Computer wins"
+    : turn === "b" ? "Computer thinking\u2026"
+    : mustTake ? "You must take" : "Your turn \u2014 you're red";
+
+  return (
+    <div>
+      <h1>Chequers</h1>
+      <div className="status">{status}</div>
+      <div className="board">
+        {board.map((p, i) => {
+          const r = Math.floor(i/8), c = i % 8, dark = isDark(r,c);
+          const tgt = targetMap.get(i);
+          return (
+            <div key={i}
+              className={"sq " + (dark ? "dark" : "light") + (sel === i ? " sel" : "")}
+              onClick={dark ? () => tap(i) : undefined}
+              role={dark ? "button" : undefined}
+              tabIndex={dark ? 0 : undefined}
+              onKeyDown={dark ? (e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tap(i); } }) : undefined}>
+              {p ? <div className={"pc " + owner(p) + (isKing(p) ? " king" : "")} /> : null}
+              {tgt ? <div className={"dot" + (tgt.captures.length ? " take" : "")} /> : null}
+            </div>
+          );
+        })}
+      </div>
+      <div className="score">
+        <div><span>You</span><b>{score.you}</b></div>
+        <div><span>Computer</span><b>{score.cpu}</b></div>
+      </div>
+      <div className="row">
+        <button className="act" onClick={reset}>{over ? "Play again" : "Start over"}</button>
+        <button className="act ghost" onClick={() => { window.location.href = "index.html"; }}>Back</button>
+      </div>
+      <div className="hint">Tap a piece, then tap a yellow spot. Taking is compulsory.</div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
