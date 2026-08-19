@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Tic-Tac-Toe</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #16283c;
+    --paper: #fdf6e3;
+    --line: #2f4d6e;
+    --x: #e0492f;
+    --o: #1f8a8c;
+    --glow: #ffcf4d;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--paper);
+    background-image: radial-gradient(circle at 1px 1px, rgba(47,77,110,.13) 1px, transparent 0);
+    background-size: 22px 22px;
+    color: var(--ink);
+    font-family: Fredoka, system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  #root { width: 100%; max-width: 420px; }
+  h1 { font-size: clamp(30px, 9vw, 44px); margin: 0 0 4px; letter-spacing: -1px; text-align: center; }
+  .status { text-align: center; font-size: 20px; min-height: 30px; margin-bottom: 14px; font-weight: 500; }
+  .board {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+    background: var(--line); padding: 10px; border-radius: 18px;
+    box-shadow: 0 8px 0 rgba(47,77,110,.35);
+  }
+  .cell {
+    aspect-ratio: 1; border: none; border-radius: 12px; background: var(--paper);
+    font-family: inherit; font-size: clamp(44px, 16vw, 68px); font-weight: 700; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: transform .08s, background .15s;
+  }
+  .cell:hover:not(:disabled) { background: #fffdf2; transform: translateY(-2px); }
+  .cell:disabled { cursor: default; }
+  .cell:focus-visible { outline: 4px solid var(--glow); outline-offset: 2px; }
+  .cell.x { color: var(--x); }
+  .cell.o { color: var(--o); }
+  .cell.win { background: var(--glow); }
+  .pop { animation: pop .18s ease-out; }
+  @keyframes pop { from { transform: scale(.4); } to { transform: scale(1); } }
+  .score { display: flex; gap: 10px; margin-top: 16px; text-align: center; }
+  .score div { flex: 1; background: #fff; border-radius: 12px; padding: 8px 4px; box-shadow: 0 3px 0 rgba(47,77,110,.2); }
+  .score span { display: block; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; opacity: .65; }
+  .score b { font-size: 26px; }
+  button.again {
+    width: 100%; margin-top: 14px; padding: 14px; font-family: inherit; font-size: 19px; font-weight: 700;
+    border: none; border-radius: 14px; background: var(--line); color: var(--paper); cursor: pointer;
+    box-shadow: 0 5px 0 rgba(47,77,110,.4);
+  }
+  button.again:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(47,77,110,.4); }
+  @media (prefers-reduced-motion: reduce) { .pop { animation: none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+function winner(b) {
+  for (const [a,c,d] of LINES) if (b[a] && b[a] === b[c] && b[a] === b[d]) return { mark: b[a], line: [a,c,d] };
+  return null;
+}
+const open = b => b.map((v,i) => v ? null : i).filter(i => i !== null);
+
+// Wins if it can, blocks if it must, otherwise plays a decent-but-beatable move.
+function computerMove(b) {
+  const free = open(b);
+  for (const m of ["O","X"])
+    for (const i of free) { const t = [...b]; t[i] = m; if (winner(t)) return i; }
+  if (Math.random() < 0.3) return free[Math.floor(Math.random() * free.length)];
+  if (b[4] === null) return 4;
+  const corners = [0,2,6,8].filter(i => b[i] === null);
+  if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
+  return free[Math.floor(Math.random() * free.length)];
+}
+
+function App() {
+  const [board, setBoard] = useState(Array(9).fill(null));
+  const [turn, setTurn] = useState("X");
+  const [score, setScore] = useState({ you: 0, cpu: 0, tie: 0 });
+  const [counted, setCounted] = useState(false);
+
+  const win = winner(board);
+  const full = open(board).length === 0;
+  const over = !!win || full;
+
+  useEffect(() => {
+    if (over || turn !== "O") return;
+    const t = setTimeout(() => {
+      setBoard(b => { const n = [...b]; n[computerMove(b)] = "O"; return n; });
+      setTurn("X");
+    }, 450);
+    return () => clearTimeout(t);
+  }, [turn, over]);
+
+  useEffect(() => {
+    if (!over || counted) return;
+    setCounted(true);
+    setScore(s => win ? (win.mark === "X" ? {...s, you: s.you+1} : {...s, cpu: s.cpu+1}) : {...s, tie: s.tie+1});
+  }, [over, counted, win]);
+
+  function play(i) {
+    if (board[i] || over || turn !== "X") return;
+    const n = [...board]; n[i] = "X";
+    setBoard(n); setTurn("O");
+  }
+
+  function reset() {
+    setBoard(Array(9).fill(null)); setTurn("X"); setCounted(false);
+  }
+
+  const status = win ? (win.mark === "X" ? "You win! 🎉" : "Computer wins")
+    : full ? "It's a tie!" : turn === "X" ? "Your turn — you're X" : "Computer thinking…";
+
+  return (
+    <div>
+      <h1>Tic-Tac-Toe</h1>
+      <div className="status">{status}</div>
+      <div className="board">
+        {board.map((v, i) => (
+          <button key={i}
+            className={"cell " + (v === "X" ? "x " : v === "O" ? "o " : "") + (win && win.line.includes(i) ? "win" : "")}
+            onClick={() => play(i)}
+            disabled={!!v || over || turn !== "X"}
+            aria-label={"Square " + (i+1) + (v ? ", " + v : ", empty")}>
+            <span className={v ? "pop" : ""}>{v}</span>
+          </button>
+        ))}
+      </div>
+      <div className="score">
+        <div><span>You</span><b>{score.you}</b></div>
+        <div><span>Ties</span><b>{score.tie}</b></div>
+        <div><span>Computer</span><b>{score.cpu}</b></div>
+      </div>
+      <button className="again" onClick={reset}>{over ? "Play again" : "Start over"}</button>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
